@@ -80,26 +80,26 @@ namespace mcp {
  * 使用示例: MCP_LOG_INIT("my_app", "logs/app.log");
  */
 #define MCP_LOG_INIT(name, ...) \
-    mcp::logger::Logger::getInstance().init(name, ##__VA_ARGS__)
+    ::mcp::logger::Logger::getInstance().init(name, ##__VA_ARGS__)
 
 /**
  * 设置日志级别的宏
  * 使用示例: MCP_LOG_SET_LEVEL(spdlog::level::debug);
  */
 #define MCP_LOG_SET_LEVEL(level) \
-    mcp::logger::Logger::getInstance().setLevel(level)
+    ::mcp::logger::Logger::getInstance().setLevel(level)
 
 /**
  * 刷新日志缓冲区的宏
  */
 #define MCP_LOG_FLUSH() \
-    mcp::logger::Logger::getInstance().flush()
+    ::mcp::logger::Logger::getInstance().flush()
 
 /**
  * 关闭日志系统的宏
  */
 #define MCP_LOG_SHUTDOWN() \
-    mcp::logger::Logger::getInstance().shutdown()
+    ::mcp::logger::Logger::getInstance().shutdown()
 
 // ================================
 // 日志记录宏定义
@@ -111,8 +111,8 @@ namespace mcp {
  */
 #define MCP_LOG_TRACE(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->trace("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->trace("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -121,8 +121,8 @@ namespace mcp {
  */
 #define MCP_LOG_DEBUG(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->debug("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->debug("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -131,8 +131,8 @@ namespace mcp {
  */
 #define MCP_LOG_INFO(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->info("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->info("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -141,8 +141,8 @@ namespace mcp {
  */
 #define MCP_LOG_WARN(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->warn("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->warn("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -151,8 +151,8 @@ namespace mcp {
  */
 #define MCP_LOG_ERROR(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->error("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->error("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -161,8 +161,8 @@ namespace mcp {
  */
 #define MCP_LOG_CRITICAL(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->critical("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->critical("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 // ================================
@@ -175,8 +175,8 @@ namespace mcp {
  */
 #define MCP_LOG_DEBUG_LOC(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->debug("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->debug("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 /**
@@ -185,8 +185,8 @@ namespace mcp {
  */
 #define MCP_LOG_ERROR_LOC(fmt, ...) \
     do { \
-        auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-        if (logger) logger->error("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+        auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+        if (mcp_logger_instance) mcp_logger_instance->error("[{}:{}] " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
 // ================================
@@ -220,8 +220,8 @@ namespace mcp {
 #define MCP_LOG_DEBUG_IF(condition, ...) \
     do { \
         if (condition) { \
-            auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-            if (logger) logger->debug(__VA_ARGS__); \
+            auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+            if (mcp_logger_instance) mcp_logger_instance->debug(__VA_ARGS__); \
         } \
     } while(0)
 
@@ -232,7 +232,7 @@ namespace mcp {
 #define MCP_LOG_ERROR_IF(condition, ...) \
     do { \
         if (condition) { \
-            auto logger = mcp::logger::Logger::getInstance().getLogger(); \
-            if (logger) logger->error(__VA_ARGS__); \
+            auto mcp_logger_instance = ::mcp::logger::Logger::getInstance().getLogger(); \
+            if (mcp_logger_instance) mcp_logger_instance->error(__VA_ARGS__); \
         } \
     } while(0)

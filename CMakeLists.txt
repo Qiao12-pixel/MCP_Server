@@ -33,6 +33,10 @@ add_executable(MCP_Server
         src/json_rpc/http_jsonrpc.cpp
         src/json_rpc/http_jsonrpc.h
         src/json_rpc/stdio_jsonrpc.cpp
+        src/mcp/types.cpp
+        src/mcp/types.h
+        src/mcp/mcp_server.cpp
+        src/mcp/mcp_server.h
 )
 
 target_compile_definitions(MCP_Server PRIVATE

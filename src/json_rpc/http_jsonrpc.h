@@ -1,7 +1,9 @@
 //
 // Created by Joe on 26-4-14.
 //
-
+/**
+ * @brief 把 HTTP 请求转换成 JSON-RPC 调用，再把处理结果通过 HTTP 响应返回出去。
+ */
 #ifndef HTTP_JSONRPC_H
 #define HTTP_JSONRPC_H
 
@@ -14,8 +16,6 @@
 
 namespace mcp {
     namespace json_rpc {
-
-
         class HttpJsonRpcServer {
         public:
             explicit HttpJsonRpcServer(JsonRpcDispatcher dispatcher);

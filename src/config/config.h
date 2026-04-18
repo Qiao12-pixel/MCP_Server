@@ -89,7 +89,7 @@ namespace mcp {
 
 
     // 便捷宏：获取 Config 单例引用
-#define MCP_CONFIG Config::GetInstance()
+#define MCP_CONFIG ::mcp::Config::GetInstance()
 
 }
 

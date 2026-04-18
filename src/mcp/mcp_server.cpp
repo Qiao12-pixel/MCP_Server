@@ -11,7 +11,7 @@
 #include "../logger/logger.h"
 
 namespace mcp {
-    namespace mcp {
+    namespace mcp_inter {
         McpServer::McpServer(const std::string &name, const std::string &version) {
             m_server_info_.name = name;
             m_server_info_.version = version;

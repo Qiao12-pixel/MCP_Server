@@ -17,7 +17,7 @@
 #include <variant> // union联合体
 
 namespace mcp {
-    namespace mcp {
+    namespace mcp_inter {
         using json = nlohmann::json;
         // MCP 协议版本
         constexpr const char* LATEST_PROTOCOL_VERSION = "2024-11-05";

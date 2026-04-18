@@ -16,7 +16,7 @@
 #include <mutex>
 
 namespace mcp {
-    namespace mcp {
+    namespace mcp_inter {
         class McpServer {
         public:
             // ===== Tool 相关类型 =====

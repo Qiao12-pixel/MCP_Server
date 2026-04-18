@@ -8,7 +8,7 @@
 
 #include "types.h"
 namespace mcp {
-    namespace mcp {
+    namespace mcp_inter {
 
         //=================================Tool=================================
         json ToolInputSchema::to_json() const {

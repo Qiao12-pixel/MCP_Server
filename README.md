@@ -490,9 +490,9 @@ ctest --test-dir /Users/joe/CLionProjects/MCP_Server/cmake-build-debug --output-
 ## 项目截图
 
 Server:
+<img width="1512" height="948" alt="image" src="https://github.com/user-attachments/assets/46fb3f14-b2c1-43c7-9790-c462ad467b1b" />
 
-<img width="1920" height="985" alt="server" src="https://github.com/user-attachments/assets/edde2a18-9a8b-4c98-8976-ec5697ef82a5" />
 
 Client:
+<img width="1843" height="649" alt="image" src="https://github.com/user-attachments/assets/d1789bd9-d144-48c2-b6e3-2924617b1a5b" />
 
-<img width="1640" height="499" alt="client window" src="https://github.com/user-attachments/assets/a74e65ba-71bb-40e4-a58c-c065ec4cce09" />

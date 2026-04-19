@@ -86,7 +86,9 @@ namespace mcp {
             for (const auto& item : content) {
                 content_arr.push_back(item.to_json());
             }
-            json j = {"content", content_arr};
+            json j = {
+                {"content", content_arr}
+            };
             if (is_error) {
                 j["is_error"] = is_error;
             }

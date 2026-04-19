@@ -12,6 +12,7 @@
 // #include "src/json_rpc/jsonrpc_serialization.h"
 #include "src/logger/logger.h"
 #include "src/mcp/mcp_server.h"
+#include <curl/curl.h>
 
 #include <iostream>
 #include <csignal>//信号处理：处理 Ctrl+C、程序退出信号
@@ -21,6 +22,7 @@
 #include <ctime>
 #include <fstream>// 文件读写：打开、读、写本地文件
 #include <sstream>// 文件读写：打开、读、写本地文件
+#include <stdexcept>
 
 
 
@@ -58,6 +60,199 @@ spdlog::level::level_enum StringToLogLevel(const std::string& level_str) {
     return spdlog::level::info;
 }
 
+namespace {
+size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    const size_t total_size = size * nmemb;
+    auto* buffer = static_cast<std::string*>(userp);
+    buffer->append(static_cast<char*>(contents), total_size);
+    return total_size;
+}
+
+std::string UrlEncode(const std::string& raw) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        throw std::runtime_error("Failed to initialize CURL for URL encoding");
+    }
+
+    char* escaped = curl_easy_escape(curl, raw.c_str(), static_cast<int>(raw.size()));
+    if (!escaped) {
+        curl_easy_cleanup(curl);
+        throw std::runtime_error("Failed to URL-encode query");
+    }
+
+    std::string encoded(escaped);
+    curl_free(escaped);
+    curl_easy_cleanup(curl);
+    return encoded;
+}
+
+json HttpGetJson(const std::string& url) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        throw std::runtime_error("Failed to initialize CURL");
+    }
+
+    std::string response_body;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_body);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "MCP_Server/1.0");
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+    const CURLcode curl_result = curl_easy_perform(curl);
+    if (curl_result != CURLE_OK) {
+        std::string error = curl_easy_strerror(curl_result);
+        curl_easy_cleanup(curl);
+        throw std::runtime_error("Weather API request failed: " + error);
+    }
+
+    long http_status = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status);
+    curl_easy_cleanup(curl);
+
+    if (http_status < 200 || http_status >= 300) {
+        throw std::runtime_error("Weather API returned HTTP status " + std::to_string(http_status));
+    }
+
+    try {
+        return json::parse(response_body);
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error(std::string("Failed to parse weather API response: ") + e.what());
+    }
+}
+
+std::string WeatherCodeToDescription(int weather_code) {
+    switch (weather_code) {
+        case 0: return "Clear sky";
+        case 1: return "Mainly clear";
+        case 2: return "Partly cloudy";
+        case 3: return "Overcast";
+        case 45:
+        case 48: return "Fog";
+        case 51:
+        case 53:
+        case 55: return "Drizzle";
+        case 56:
+        case 57: return "Freezing drizzle";
+        case 61:
+        case 63:
+        case 65: return "Rain";
+        case 66:
+        case 67: return "Freezing rain";
+        case 71:
+        case 73:
+        case 75: return "Snow";
+        case 77: return "Snow grains";
+        case 80:
+        case 81:
+        case 82: return "Rain showers";
+        case 85:
+        case 86: return "Snow showers";
+        case 95: return "Thunderstorm";
+        case 96:
+        case 99: return "Thunderstorm with hail";
+        default: return "Unknown";
+    }
+}
+
+std::string FormatWindDirection(double degrees) {
+    static const char* directions[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+    const int index = static_cast<int>((degrees + 22.5) / 45.0) % 8;
+    return directions[index];
+}
+
+double ParseNumericArgument(const json& value, const std::string& field_name) {
+    try {
+        if (value.is_number()) {
+            return value.get<double>();
+        }
+        if (value.is_string()) {
+            const std::string raw = value.get<std::string>();
+            size_t processed = 0;
+            const double parsed = std::stod(raw, &processed);
+            if (processed != raw.size()) {
+                throw std::runtime_error("invalid trailing characters");
+            }
+            return parsed;
+        }
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid numeric argument for '" + field_name + "'");
+    }
+
+    throw std::runtime_error("Invalid numeric argument for '" + field_name + "'");
+}
+
+json FetchWeatherReport(const std::string& city) {
+    const std::string encoded_city = UrlEncode(city);
+    const std::string geocode_url =
+        "https://geocoding-api.open-meteo.com/v1/search?name=" + encoded_city +
+        "&count=1&format=json";
+    const json geocode_json = HttpGetJson(geocode_url);
+
+    json location;
+    if (geocode_json.is_object()) {
+        if (!geocode_json.contains("results") || !geocode_json["results"].is_array() || geocode_json["results"].empty()) {
+            throw std::runtime_error("City not found: " + city);
+        }
+        location = geocode_json["results"].at(0);
+    } else if (geocode_json.is_array()) {
+        if (geocode_json.empty()) {
+            throw std::runtime_error("City not found: " + city);
+        }
+        location = geocode_json.at(0);
+    } else {
+        throw std::runtime_error("Unexpected geocoding response format for city: " + city);
+    }
+
+    const double latitude = location.at("latitude").get<double>();
+    const double longitude = location.at("longitude").get<double>();
+    const std::string resolved_name = location.value("name", city);
+    const std::string country = location.value("country", std::string("Unknown country"));
+
+    const std::string forecast_url =
+        "https://api.open-meteo.com/v1/forecast?latitude=" + std::to_string(latitude) +
+        "&longitude=" + std::to_string(longitude) +
+        "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code"
+        "&timezone=auto";
+    const json forecast_json = HttpGetJson(forecast_url);
+
+    json forecast_root = forecast_json;
+    if (forecast_json.is_array()) {
+        if (forecast_json.empty()) {
+            throw std::runtime_error("Weather API returned an empty forecast response");
+        }
+        forecast_root = forecast_json.at(0);
+    }
+
+    if (!forecast_root.is_object() || !forecast_root.contains("current") || !forecast_root["current"].is_object()) {
+        throw std::runtime_error("Weather API response missing current weather data");
+    }
+
+    const json& current = forecast_root["current"];
+    const double temperature = current.at("temperature_2m").get<double>();
+    const int humidity = current.at("relative_humidity_2m").get<int>();
+    const double wind_speed = current.at("wind_speed_10m").get<double>();
+    const double wind_direction = current.at("wind_direction_10m").get<double>();
+    const int weather_code = current.at("weather_code").get<int>();
+    const std::string observation_time = current.value("time", std::string("unknown"));
+
+    return json{
+        {"city", resolved_name},
+        {"country", country},
+        {"observation_time", observation_time},
+        {"temperature_c", temperature},
+        {"condition", WeatherCodeToDescription(weather_code)},
+        {"humidity_percent", humidity},
+        {"wind_speed_kmh", wind_speed},
+        {"wind_direction_degrees", wind_direction},
+        {"wind_direction", FormatWindDirection(wind_direction)},
+        {"weather_code", weather_code},
+        {"source", "Open-Meteo Geocoding API + Forecast API"}
+    };
+}
+} // namespace
+
 
 
 
@@ -91,15 +286,15 @@ void setup_mcp_server(McpServer& mcp) {
         tool.description = "Perform basic arithmetic operations";
         tool.input_schema.properties = {
             {"operation", {{"type", "string"}, {"enum", json::array({"add", "subtract", "multiply", "divide"})}}},
-            {"a", {"type", "string"}},
-            {"b", {"type", "string"}}
+            {"a", {{"type", "string"}}},
+            {"b", {{"type", "string"}}}
         };
         tool.input_schema.required = {"operation", "a", "b"};
 
         mcp.RegisterTool(tool, [](const json& args) -> ToolResult {
             std::string opera = args.at("operation").get<std::string>();
-            double a = args.at("a").get<double>();
-            double b = args.at("b").get<double>();
+            double a = ParseNumericArgument(args.at("a"), "a");
+            double b = ParseNumericArgument(args.at("b"), "b");
             double result_value = 0;
 
             if (opera == "add") {
@@ -163,26 +358,20 @@ void setup_mcp_server(McpServer& mcp) {
         mcp.RegisterTool(tool, [](const json &args) -> ToolResult {
             std::string city = args.at("city").get<std::string>();
 
-            //先模拟天气数据
-            std::time_t now = std::time(nullptr);
-            char time_buff[100];
-            std::strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-
-            std::ostringstream weather_info;
-            weather_info << "Weather Report for " << city << "\n";
-            weather_info << "========================\n";
-            weather_info << "Time: " << time_buff << "\n";
-            weather_info << "Temperature: 22°C\n";
-            weather_info << "Condition: Sunny\n";
-            weather_info << "Humidity: 45%\n";
-            weather_info << "Wind: 5 km/h NE\n";
-            weather_info << "\n(Note: This is simulated data. Integrate with real weather API for production)";
-
             ToolResult result;
-            result.content.push_back(ContentItem{
-                .type = "text",
-                .text = weather_info.str()
-            });
+            try {
+                result.content.push_back(ContentItem{
+                    .type = "text",
+                    .text = FetchWeatherReport(city).dump(2),
+                    .mime_type = "application/json"
+                });
+            } catch (const std::exception& e) {
+                result.is_error = true;
+                result.content.push_back(ContentItem{
+                    .type = "text",
+                    .text = std::string("Error fetching weather: ") + e.what()
+                });
+            }
             return result;
         });
     }
@@ -330,8 +519,16 @@ mcp::json_rpc::JsonRpcDispatcher create_dispatcher(McpServer& mcp_server) {
 
     //tools/call
     dispatcher.RegisterHandler("tools/call", [&mcp_server](const json& params) -> json {
+        if (!params.is_object()) {
+            throw std::runtime_error("tools/call params must be an object, got: " + params.dump());
+        }
+
         std::string name = params.at("name").get<std::string>();
         json arguments = params.value("arguments", json::object());
+        if (!arguments.is_object()) {
+            throw std::runtime_error("tools/call arguments for '" + name + "' must be an object, got: " + arguments.dump());
+        }
+
         MCP_LOG_INFO("Calling tool: {}", name);
         auto result = mcp_server.CallTool(name, arguments);
         return result.to_json();
@@ -469,6 +666,8 @@ void run_both_mode(McpServer& mcp_server, const std::string& host, int port) {
 
 }
 int main(int argc, char* argv[]) {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+
     //解析命令行参数
     std::string config_file = "../config/server.json";
     std::string mode= "http";
@@ -497,12 +696,14 @@ int main(int argc, char* argv[]) {
                       << "  " << argv[0] << " --mode http --port 8080\n"
                       << "  " << argv[0] << " --mode stdio\n"
                       << "  " << argv[0] << " --mode both --port 8080\n";
+            curl_global_cleanup();
             return 0;
         }
     }
     // 验证模式
     if (mode != "http" && mode != "stdio" && mode != "both") {
         std::cerr << "Invalid mode: " << mode << " (must be http, stdio, or both)" << std::endl;
+        curl_global_cleanup();
         return 1;
     }
 
@@ -561,8 +762,10 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         MCP_LOG_ERROR("Fatal error: {}", e.what());
         std::cerr << "Fatal error: " << e.what() << std::endl;
+        curl_global_cleanup();
         return 1;
     }
     MCP_LOG_SHUTDOWN();
+    curl_global_cleanup();
     return 0;
 }
